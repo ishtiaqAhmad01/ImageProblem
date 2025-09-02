@@ -1,1 +1,1 @@
-gunicorn ImageProblem.wsgi:application --chdir src
+gunicorn ImageProblem.wsgi:application
