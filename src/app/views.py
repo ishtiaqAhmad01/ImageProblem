@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import School, ImageUpload, Notification, DailyReport
+from model.main import MyModel
 from .serializers import *
 
 User = get_user_model()
@@ -171,6 +172,17 @@ class ImageUploadListCreateAPIView(APIView):
         serializer = ImageUploadSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             upload = serializer.save()
+
+
+            model = MyModel.get_model()   # it's a (static meathod) => no need to create object 
+            image_path = upload.image_file.path  
+
+            # Run head count Model
+            head_count = model.predict_and_count(image_path)
+            print(head_count)
+            upload.head_count = head_count
+            upload.save()
+
             return Response({
                 "success": True,
                 "message": "Image uploaded successfully",

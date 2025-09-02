@@ -23,7 +23,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = "__all__"
+        fields = ["id", "first_name", "last_name", "email", "password", "role", "school"]
 
         extra_kwargs = {
             'first_name': {'required': True},
@@ -41,7 +41,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         while User.objects.filter(username=username).exists():
             username = f"{base_username}_{get_random_string(6)}"
 
-        user = User(username=username, **validated_data)
+        user = User(**validated_data)
         user.set_password(password)
         user.save()
         return user
@@ -57,7 +57,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = "__all__"
+        fields = ["id", "first_name", "last_name", "full_name", "email", "role", "school"]
     
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
