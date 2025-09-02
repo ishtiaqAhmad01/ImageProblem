@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 
-urlpatterns = [
+appurls = [
     # Schools
     path("schools/", views.SchoolListCreateAPIView.as_view(), name="school-list-create"),
     path("schools/<int:pk>/", views.SchoolDetailAPIView.as_view(), name="school-detail"),
