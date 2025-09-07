@@ -1,1 +1,1 @@
-gunicorn ImageProblem.wsgi:application
+web: gunicorn ImageProblem.wsgi:application
