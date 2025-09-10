@@ -1,5 +1,4 @@
 import os
-from ultralytics import YOLO
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
@@ -9,6 +8,7 @@ class MyModel:
     # ----------------------------------------------------------
     def __init__(self, model_path=None):
         if not hasattr(self, "yolo"):
+            from ultralytics import YOLO
             if model_path is None:
                 model_path = os.path.join(os.path.dirname(__file__), "..", "model_weights", "First_head_count_model.pt")
                 model_path = os.path.abspath(model_path)
