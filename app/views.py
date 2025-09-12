@@ -174,13 +174,13 @@ class ImageUploadListCreateAPIView(APIView):
             upload = serializer.save()
 
 
-            model = MyModel.get_model()   # it's a (static meathod) => no need to create object 
-            image_path = upload.image_file.path  
+            # model = MyModel.get_model()   # it's a (static meathod) => no need to create object 
+            # image_path = upload.image_file.path  
 
-            # Run head count Model
-            head_count = model.predict_and_count(image_path)
-            print(head_count)
-            upload.head_count = head_count
+            # # Run head count Model
+            # head_count = model.predict_and_count(image_path)
+            # print(head_count)
+            # upload.head_count = head_count
             upload.save()
 
             return Response({
