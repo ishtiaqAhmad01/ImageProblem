@@ -5,9 +5,14 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import School, ImageUpload, Notification, DailyReport
+from .models import *
 from .hasing import get_sha256_from_pil
 from .serializers import *
+from .sendemail import send_otp_email
+import uuid
+import random
+from datetime import timedelta
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -51,6 +56,7 @@ class RegisterAPIView(APIView):
     
     def post(self, request):
         serializer = UserCreateSerializer(data=request.data)
+        print(request.data)
         if serializer.is_valid():
             user = serializer.save()
             return Response({
@@ -446,47 +452,128 @@ class ChangePasswordAPIView(APIView):
                 "message": f"Password change failed: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# -------------------------------------------- Forget Password ------------------------------------------------------------
+# --------------------------------------------Request password reset-------------------------------------
 
-class ForgetPasswordAPIView(APIView):
+class RequestPasswordResetAPIView(APIView):
     permission_classes = [permissions.AllowAny]
-    
+
     def post(self, request):
-        first_name = request.data.get("first_name")
-        last_name = request.data.get("last_name")
         email = request.data.get("email")
-        new_password = request.data.get("new_password")
-        
-        if not first_name or not last_name or not email or not new_password:
+        print(email)
+        if not email:
             return Response({
                 "success": False,
-                "message": "First name, last name, email, and new password are required"
+                "message": "Email is required"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
-            # Cross-check user details
-            user = User.objects.get(
-                first_name=first_name,
-                last_name=last_name,
-                email=email
+            user = User.objects.get(email=email)
+
+            # generate 6-digit OTP
+            otp = str(random.randint(100000, 999999))
+
+            # save OTP
+            PasswordResetOTP.objects.create(
+                user=user,
+                otp=otp,
+                expires_at=timezone.now() + timedelta(minutes=5)
             )
-            
-            # Update password
-            user.set_password(new_password)
-            user.save()
-            
+
+            print("Done 1")
+            # send OTP
+            send_otp_email(user, otp)
+            print("Done 2")
+
             return Response({
                 "success": True,
-                "message": "Password reset successfully"
+                "message": "OTP sent to your email"
             })
-            
+
+        except:
+            return Response({
+                "success": False,
+                "message": "If this email exists, an OTP has been sent."
+            })
+
+
+# --------------------------------------------Verify OTP ---------------------------------
+
+class VerifyOTPAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+
+        if not email or not otp:
+            return Response({
+                "success": False,
+                "message": "Email and OTP are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+            otp_record = PasswordResetOTP.objects.filter(
+                user=user, otp=otp, expires_at__gte=timezone.now()
+            ).last()
+
+            if not otp_record:
+                return Response({
+                    "success": False,
+                    "message": "Invalid or expired OTP"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # create temporary reset token
+            reset_token = str(uuid.uuid4())
+            otp_record.reset_token = reset_token
+            otp_record.save()
+
+            return Response({
+                "success": True,
+                "message": "OTP verified",
+                "reset_token": reset_token
+            })
+
         except User.DoesNotExist:
             return Response({
                 "success": False,
-                "message": "No user found with the provided details"
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
+                "message": "Invalid request"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+#---------------------------------------------Reset password OTP -------------------------------
+
+class ResetPasswordAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        reset_token = request.data.get("reset_token")
+        new_password = request.data.get("new_password")
+
+        if not reset_token or not new_password:
             return Response({
                 "success": False,
-                "message": f"Password reset failed: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                "message": "Reset token and new password are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_record = PasswordResetOTP.objects.filter(
+            reset_token=reset_token,
+            expires_at__gte=timezone.now()
+        ).last()
+
+        if not otp_record:
+            return Response({
+                "success": False,
+                "message": "Invalid or expired reset token"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user = otp_record.user
+        user.set_password(new_password)
+        user.save()
+
+        # invalidate token
+        otp_record.delete()
+
+        return Response({
+            "success": True,
+            "message": "Password reset successful"
+        })

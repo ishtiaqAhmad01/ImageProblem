@@ -35,5 +35,7 @@ appurls = [
     path('change-password/', views.ChangePasswordAPIView.as_view(), name='change-password'),
 
     # Forget Password API
-    path('forget-password/', views.ForgetPasswordAPIView.as_view(), name='forget-password'),
+    path("request-reset/", views.RequestPasswordResetAPIView.as_view(), name="request-reset"),
+    path("verify-otp/", views.VerifyOTPAPIView.as_view(), name="verify-otp"),
+    path("reset-password/", views.ResetPasswordAPIView.as_view(), name="reset-password"),
 ]

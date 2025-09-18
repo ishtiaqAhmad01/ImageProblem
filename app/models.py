@@ -106,3 +106,13 @@ class DailyReport(models.Model):
     
     def __str__(self):
         return f"DailyReport {self.report_date} (uploads={self.total_uploads})"
+    
+
+# -------------------------------------  PasswordResetOTP ------------------------------------------------
+
+class PasswordResetOTP(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    otp = models.CharField(max_length=6)
+    reset_token = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
