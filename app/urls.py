@@ -26,4 +26,14 @@ appurls = [
     path("reports/", views.DailyReportListCreateAPIView.as_view(), name="report-list-create"),
     path("reports/<int:pk>/", views.DailyReportDetailAPIView.as_view(), name="report-detail"),
     path("reports/summary/", views.DailyReportSummaryAPIView.as_view(), name="report-summary"),
+
+
+    # Compare Images API
+    path('compare-images/', views.CompareImagesAPIView.as_view(), name='compare-images'),
+
+    # Change Password API  
+    path('change-password/', views.ChangePasswordAPIView.as_view(), name='change-password'),
+
+    # Forget Password API
+    path('forget-password/', views.ForgetPasswordAPIView.as_view(), name='forget-password'),
 ]

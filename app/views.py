@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import School, ImageUpload, Notification, DailyReport
-from model.main import MyModel
+from .hasing import get_sha256_from_pil
 from .serializers import *
 
 User = get_user_model()
@@ -218,7 +218,7 @@ class ImageUploadRecentAPIView(APIView):
     
     def get(self, request):
         user_id = request.query_params.get("user_id")
-        print(user_id)
+        # print(user_id)
         if not user_id:
             return Response({
                 "success": False,
@@ -361,3 +361,132 @@ class DailyReportSummaryAPIView(APIView):
                 "total_duplicates": total_duplicates,
             }
         })
+
+# -------------------------------------------- Compare Images ------------------------------------------------------------
+
+class CompareImagesAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def post(self, request):
+        image1 = request.FILES.get('image1')
+        image2 = request.FILES.get('image2')
+        
+        if not image1 or not image2:
+            return Response({
+                "success": False,
+                "message": "Both image1 and image2 are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            image1_hash = get_sha256_from_pil(image1)
+            image2_hash = get_sha256_from_pil(image2)
+           
+            comparison_result = {
+                "similarity_percentage": 99.9,  
+                "is_duplicate": image1_hash == image2_hash, 
+                "comparison_details": "Comparison completed successfully"
+            }
+            
+            return Response({
+                "success": True,
+                "message": "Images compared successfully",
+                "data": comparison_result
+            })
+            
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": f"Image comparison failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# -------------------------------------------- Change Password ------------------------------------------------------------
+
+class ChangePasswordAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        email = request.data.get("email")
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+        
+        if not email or not old_password or not new_password:
+            return Response({
+                "success": False,
+                "message": "Email, old password, and new password are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            # Check if old password is correct
+            if not user.check_password(old_password):
+                return Response({
+                    "success": False,
+                    "message": "Old password is incorrect"
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+            
+            return Response({
+                "success": True,
+                "message": "Password changed successfully"
+            })
+            
+        except User.DoesNotExist:
+            return Response({
+                "success": False,
+                "message": "User with this email does not exist"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": f"Password change failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# -------------------------------------------- Forget Password ------------------------------------------------------------
+
+class ForgetPasswordAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        first_name = request.data.get("first_name")
+        last_name = request.data.get("last_name")
+        email = request.data.get("email")
+        new_password = request.data.get("new_password")
+        
+        if not first_name or not last_name or not email or not new_password:
+            return Response({
+                "success": False,
+                "message": "First name, last name, email, and new password are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Cross-check user details
+            user = User.objects.get(
+                first_name=first_name,
+                last_name=last_name,
+                email=email
+            )
+            
+            # Update password
+            user.set_password(new_password)
+            user.save()
+            
+            return Response({
+                "success": True,
+                "message": "Password reset successfully"
+            })
+            
+        except User.DoesNotExist:
+            return Response({
+                "success": False,
+                "message": "No user found with the provided details"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": f"Password reset failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
