@@ -13,6 +13,8 @@ import uuid
 import random
 from datetime import timedelta
 from django.utils import timezone
+from model.main import MyModel
+from PIL import Image
 
 User = get_user_model()
 
@@ -174,20 +176,23 @@ class ImageUploadListCreateAPIView(APIView):
             "data": serializer.data
         })
     
-    def post(self, request):
+    def post(self, request):  # requries a user_id
         serializer = ImageUploadSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             upload = serializer.save()
 
 
-            # model = MyModel.get_model()   # it's a (static meathod) => no need to create object 
-            # image_path = upload.image_file.path  
-
-            # # Run head count Model
-            # head_count = model.predict_and_count(image_path)
-            # print(head_count)
-            # upload.head_count = head_count
+            
+            model = MyModel.get_model()   # it's a (static meathod) => no need to create object 
+            image_path = upload.image_file.path
+            # Run head count Model
+            head_count = model.predict_and_count(image_path)
+            upload.head_count = head_count
+            upload.image_hash = get_sha256_from_pil(upload.image_file)
+            exists = ImageUpload.objects.filter(image_hash=upload.image_hash).exclude(pk=upload.pk).exists()
+            upload.duplicate_flag = exists
             upload.save()
+
 
             return Response({
                 "success": True,
@@ -368,43 +373,65 @@ class DailyReportSummaryAPIView(APIView):
             }
         })
 
-# -------------------------------------------- Compare Images ------------------------------------------------------------
+# -------------------------------------------- Compare Images -----------------------------------------------------------
+
 
 class CompareImagesAPIView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [MultiPartParser, FormParser]
-    
+
     def post(self, request):
-        image1 = request.FILES.get('image1')
-        image2 = request.FILES.get('image2')
-        
-        if not image1 or not image2:
+        images = request.FILES.getlist('images')
+
+        if len(images) < 2:
             return Response({
                 "success": False,
-                "message": "Both image1 and image2 are required"
+                "message": "At least 2 images are required for comparison"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
-            image1_hash = get_sha256_from_pil(image1)
-            image2_hash = get_sha256_from_pil(image2)
-           
-            comparison_result = {
-                "similarity_percentage": 99.9,  
-                "is_duplicate": image1_hash == image2_hash, 
-                "comparison_details": "Comparison completed successfully"
-            }
+            image_hashes = {}
+            for i, img in enumerate(images):
+                image_hashes[f"image_{i+1}"] = get_sha256_from_pil(img)
+
+            # Step 2: Compare all images pairwise
+            comparisons = {}
+            keys = list(image_hashes.keys())
+            for image_name, image_hash in image_hashes.items():
+                if image_hash in comparisons:
+                    comparisons[image_hash].append(image_name)
+                else:
+                    comparisons[image_hash] = [image_name]
             
+            comparisons_resutls = {}
+
+            for i, a in enumerate(comparisons):
+                comparisons_resutls[f"Group {i+1}"] = comparisons[a]
+
+
+            # Head count 
+            model = MyModel.get_model()
+            head_counts = {}
+
+            for i, img in enumerate(images):
+                pil_image = Image.open(img)
+                head_counts[f"{i+1}"] = model.predict_and_count(pil_image)
+
             return Response({
                 "success": True,
                 "message": "Images compared successfully",
-                "data": comparison_result
+                "data": {
+                    "comparisons": comparisons_resutls,
+                    "head_counts" : head_counts
+                }
             })
-            
+
         except Exception as e:
             return Response({
                 "success": False,
                 "message": f"Image comparison failed: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # -------------------------------------------- Change Password ------------------------------------------------------------
 
